@@ -1,0 +1,148 @@
+# Power calculation for SAMURAI objective 3.  
+
+# Prospective cluster randomised cross-over trial 
+# (ABABAB/BABABA) to assess the 
+# impact of an AI fracture detection tool 
+# in EDs and MIUs in the UK. 
+
+# FROM THE PROTOCOL: 
+# The trial will involve installing a CE-approved AI algorithm at each site for six months. 
+# Sites will be randomly assigned to begin the trial with the AI algorithm either active ("On")
+# or inactive ("Off") during the first month. Thereafter, the algorithm status will 
+# alternate each month (“AI On” and “AI Off”) for the remaining five months. 
+
+# This study will be conducted across four sites, divided into 3 clusters:
+
+# Cluster 1:
+
+# Oxford University Hospitals NHS Foundation Trust 
+# John Radcliffe Hospital ED (Level 1 ED)
+#	Horton General Hospital ED (Level 1 ED) 
+#	Oxford Health Trust
+#	MIUs (Level 3 EDs)
+
+# Cluster 2:
+# Royal Berkshire NHS Foundation Trust 
+# Royal Berkshire Hospital ED (Level 1 ED)
+#	Associated MIUs (Level 3 ED) 
+
+# Cluster 3:
+#	Buckinghamshire Healthcare NHS Trust
+#	Stoke Mandeville Hospital ED (Level 1 ED)
+#	Associated MIUs (Level 3 ED)
+
+# The sample size was carried out to seek to detect a difference of 1% in 
+# the number of inappropriate NHS contacts. We anticipate an average of 
+# 3000 fracture scans per calendar month per trust. 
+
+# Of these on average  
+# 800 per site are anticipated to show a fracture. Assuming an inappropriate 
+# NHS intervention rate of 5.5% (suggested in a recent RCT evaluating 
+# adjusting the fracture pathway), a 2-sided significance level of 5%, 
+# an intra-cluster correlation of 0.05 is sufficient to detect a reduction of 0.5% 
+# in the missed fracture rate at 90% or above power for overall and within key subset 
+# comparisons (sex, site type, age, and ethnic groups).
+
+rm(list = ls())
+
+library(car)
+library(daewr)
+
+# Number of simulated trials
+M <- 1000
+
+# p0 = NHS intervention rate, p1 = rate - 1%
+p0 <- 0.055
+p1 <- 0.045
+co <- 0.9
+p <- numeric(M)
+
+site.names <- c("1.JR","1.Horton","1.MIUs","2.RBH","2.AssocMuis","3.StokeMand","3.AssocMuis")
+
+for (i in 1:M){
+  # fractures per period, per site 
+  n <- rpois(42,800)
+  
+  # each cluster rep't over 6 periods 
+  cluster <- factor(c(rep(1,18),rep(2,12),rep(3,12)))
+  
+  site <- factor(rep(unit.names,each=6))
+  
+  # six periods rep't over 7 NHS units
+  period <- factor(rep(1:6,7))
+  
+  # treatment assignment to each cluster
+  treat <- factor(
+    c(rep(c(1,2,2,2,1,1),3),
+    rep(c(1,1,2,2,2,1),2),
+    rep(c(2,2,1,1,1,2),2)),
+    levels=1:2, 
+    labels = c("A","B"))
+
+  # indicator periods for periods potentially affected by 
+  # carry over effects (following treatment)
+  carry <- factor(
+    c(rep(c(0,0,0,0,1,1),3),
+      rep(c(0,0,0,0,0,1),2),
+      rep(c(0,0,1,1,1,0),2)), 
+    levels=0:1,labels = c("None","Yes"))
+
+  y <- c(
+    # cluster 1 JR  
+    rbinom(1,n[1],p0), # A 
+    rbinom(3,n[2:4],p1), # 3 B
+    rbinom(2,n[5:6],p0*co), # 2 A each with carry-over
+    
+    # cluster 1 Horton 
+    rbinom(1,n[7],p0), # 1 A
+    rbinom(3,n[8:10],p1), # 3 B
+    rbinom(2,n[11:12],p0*co), # 2 A each with carry-over 
+    
+    # cluster 1 MIUs
+    rbinom(1,n[13],p0), # 1 A
+    rbinom(3,n[14:16],p1), # 3 B
+    rbinom(2,n[17:18],p0*co), # 2 A with carry-over 
+    
+    # cluster 2 RBH 
+    rbinom(2,n[19:20],p0), # 2 A
+    rbinom(3,n[21:23],p1), # 3 B
+    rbinom(1,n[24],p0*co), # 1 A with carry-over
+    
+    # Cluster 2 Assoc Muis 
+    rbinom(2,n[25:26],p0), # 2 A
+    rbinom(3,n[27:29],p1), # 3 B
+    rbinom(1,n[30],p0*0.9), # 1 A with carry over
+    
+    # cluster 3    
+    rbinom(2,n[31:32],p1), # 2 B 
+    rbinom(3,n[33:35],p0*co), # 3 A with carry-over
+    rbinom(1,n[36],p1), # 1 B
+
+    # Cluster 3 
+    rbinom(2,n[37:38],p1), # 2 B
+    rbinom(3,n[39:41],p0*co), # 3 A with carry-over 
+    rbinom(1,n[42],p1)) # 1 A 
+
+  dt <- data.frame(cluster, site, period, treat,carry,y,n)
+
+  mod <- glm(cbind(y,n) ~ cluster + period + treat + carry, 
+             data = dt, 
+             family = binomial, 
+             contrasts = list(cluster = contr.sum, 
+                              period = contr.sum,
+                              treat = contr.sum, 
+                              carry = contr.sum))
+
+  su <- summary(mod)
+
+  p[i] <- su$coefficients['treat1',4]
+}
+
+mean(p < 0.05)
+
+# example of data
+head(dt)
+
+# example of analysis
+su
+
