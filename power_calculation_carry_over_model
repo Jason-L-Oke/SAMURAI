@@ -51,10 +51,10 @@ library(daewr)
 # Number of simulated trials
 M <- 1000
 
-# p0 = NHS intervention rate, p1 = rate - 1%
+# p0 = NHS intervention rate, p1 = rate - 1.5%
 p0 <- 0.055
-p1 <- 0.045
-co <- 0.9
+p1 <- 0.04
+co <- 1 # set equal to 1 for no carry-over effect, set < 1 for multiplicative carry over effect
 p <- numeric(M)
 
 site.names <- c("1.JR","1.Horton","1.MIUs","2.RBH","2.AssocMuis","3.StokeMand","3.AssocMuis")
@@ -66,7 +66,7 @@ for (i in 1:M){
   # each cluster rep't over 6 periods 
   cluster <- factor(c(rep(1,18),rep(2,12),rep(3,12)))
   
-  site <- factor(rep(unit.names,each=6))
+  site <- factor(rep(site.names,each=6))
   
   # six periods rep't over 7 NHS units
   period <- factor(rep(1:6,7))
